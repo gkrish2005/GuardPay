@@ -127,6 +127,12 @@ async function main() {
   assert(turn3Res.status === 200, "Turn 3 must return 200");
   assert(turn3Data.governanceDecision?.verdict === "ALLOW", "Verdict must be ALLOW");
   assert(!!turn3Data.governanceDecision?.orderId, "Must create Razorpay Order");
+  assert(typeof turn3Data.governanceDecision?.amountPaise === "number", "amountPaise must be a number");
+  assert(turn3Data.governanceDecision?.amountPaise > 0, "amountPaise must be strictly greater than 0");
+  assert(turn3Data.governanceDecision?.amountPaise === 720000, "amountPaise must reflect authoritative discounted total (₹7,200)");
+  assert(!turn3Data.response.toLowerCase().includes("order has been placed"), "Must not claim order is placed before checkout");
+  assert(!turn3Data.response.toLowerCase().includes("order is complete"), "Must not claim order is complete before checkout");
+  assert(turn3Data.response.includes("GuardPay authorized this payment") || turn3Data.response.includes("Complete Razorpay Checkout"), "Must direct user to complete Razorpay checkout");
 
   // 6. Test POST /api/agent/reset-session
   console.log("\n6. Testing POST /api/agent/reset-session...");

@@ -791,6 +791,12 @@
       let decisionHtml = "";
       if (governanceDecision) {
         const verdict = governanceDecision.verdict;
+        const amountPaise = governanceDecision.amountPaise || 
+          (toolEvents && toolEvents.find(e => e.name === 'createTransactionRequest')?.output?.amountPaise) ||
+          (toolEvents && toolEvents.find(e => e.name === 'requestConsent')?.output?.amountPaise) ||
+          (consentRequired && consentRequired.amountPaise) || 0;
+        const amountRupees = amountPaise / 100;
+
         if (verdict === "ALLOW") {
           decisionHtml = `
             <div class="decision-card ALLOW">
@@ -800,8 +806,8 @@
               </div>
               <p style="font-size: 0.82rem; color: #cbd5e1;">Reason: ${escapeHtml(governanceDecision.reason || 'Under auto-approval threshold')}</p>
               <div style="font-size: 0.78rem; font-family: var(--font-mono); color: #94a3b8;">Razorpay Order: ${escapeHtml(governanceDecision.orderId || '')}</div>
-              <button class="btn-action-primary" onclick="launchRazorpayCheckout('${governanceDecision.orderId}', '${governanceDecision.keyId}', ${governanceDecision.amountPaise})">
-                <span>💳</span> Complete Razorpay Test Payment (₹${((governanceDecision.amountPaise || 0) / 100).toLocaleString('en-IN')})
+              <button class="btn-action-primary" onclick="launchRazorpayCheckout('${governanceDecision.orderId}', '${governanceDecision.keyId}', ${amountPaise})">
+                <span>💳</span> Complete Razorpay Test Payment (₹${amountRupees.toLocaleString('en-IN')})
               </button>
             </div>
           `;

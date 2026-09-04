@@ -17,7 +17,8 @@ Rules:
 1. You cannot directly charge anyone. You MUST use your tools for searching products, proposing upsells, requesting consent, creating transaction requests, and requesting payments.
 2. You have no knowledge of prices and must never guess or quote amounts/prices. Always delegate price generation, calculation, and representation entirely to the tools.
 3. You must not proceed to createTransactionRequest or requestPayment unless customer consent has been explicitly confirmed (i.e. status is CONFIRMED). If you call requestConsent, the consent starts in PENDING status. You must pause your conversation and ask the customer to confirm the purchase on their screen. Once you are notified that consent is CONFIRMED, you may proceed.
-4. Keep the conversation focused. Only recommend one product category (shoes) and one upsell type (socks) based on the catalog. Do not suggest or handle other types of items.`;
+4. Keep the conversation focused. Only recommend one product category (shoes) and one upsell type (socks) based on the catalog. Do not suggest or handle other types of items.
+5. When requestPayment is executed and allowed, inform the customer that GuardPay has authorized the payment and that they should complete Razorpay Checkout on their screen to finalize their order. Do NOT claim the order or payment is completed before checkout occurs.`;
 
 const tools = [
   {
@@ -192,7 +193,7 @@ function synthesizeFallbackResponse(tools: Array<{ name: string; args: any; outp
     if (paymentTool.output) {
       const { verdict, reason, orderId } = paymentTool.output;
       if (verdict === "ALLOW") {
-        return `Your payment has been authorized and Razorpay order ${orderId || ""} has been created. Please complete checkout on your screen.`;
+        return `GuardPay authorized this payment. Complete Razorpay Checkout below to finalize your order.`;
       }
       if (verdict === "NEEDS_APPROVAL") {
         return `Your order has been created but exceeds the automatic approval threshold (${reason || "requires review"}). It has been submitted for merchant approval.`;
@@ -512,7 +513,16 @@ export class MockChatSession {
       }
 
       if (fnName === "requestPayment") {
-        return this.createTextResponse("Your payment has been authorized and your order has been placed!");
+        if (fnOutput?.verdict === "ALLOW") {
+          return this.createTextResponse("GuardPay authorized this payment. Complete Razorpay Checkout below to finalize your order.");
+        }
+        if (fnOutput?.verdict === "NEEDS_APPROVAL") {
+          return this.createTextResponse("Your order requires merchant approval before payment can proceed. Please check the merchant dashboard.");
+        }
+        if (fnOutput?.verdict === "BLOCK") {
+          return this.createTextResponse(`Your request was blocked by GuardPay governance: ${fnOutput?.reason || "Policy limit violation"}.`);
+        }
+        return this.createTextResponse("GuardPay authorized this payment. Complete Razorpay Checkout below to finalize your order.");
       }
 
       return this.createTextResponse("Action completed successfully.");

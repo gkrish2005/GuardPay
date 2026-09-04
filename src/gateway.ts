@@ -274,7 +274,11 @@ export async function requestPayment(
     // Check agent permission: If action is not enabled for this agent, block immediately
     const permissions = (agent.permissions || {}) as any;
     if (!permissions[transactionRequest.actionType]?.enabled) {
-      const decision = { verdict: "BLOCK" as const, reason: "Action not permitted for this agent" };
+      const decision = {
+        verdict: "BLOCK" as const,
+        reason: "Action not permitted for this agent",
+        amountPaise: transactionRequest.amountPaise,
+      };
       await tx.decision.create({
         data: {
           transactionRequestId,
@@ -301,7 +305,11 @@ export async function requestPayment(
         },
         tx
       );
-      return decision;
+      return {
+        verdict: decision.verdict,
+        reason: decision.reason,
+        transactionRequest,
+      };
     }
 
     // Resolve latest policy itself from DB using agentId + actionType
@@ -428,6 +436,7 @@ export async function requestPayment(
         reason: result.reason,
         orderId: order.id,
         keyId: process.env.RAZORPAY_KEY_ID,
+        amountPaise: result.transactionRequest.amountPaise,
       };
     } catch (error: any) {
       await writeAuditLog({
@@ -442,6 +451,10 @@ export async function requestPayment(
     }
   }
 
-    return { verdict: result.verdict, reason: result.reason };
+    return {
+      verdict: result.verdict,
+      reason: result.reason,
+      amountPaise: result.transactionRequest.amountPaise,
+    };
   });
 }

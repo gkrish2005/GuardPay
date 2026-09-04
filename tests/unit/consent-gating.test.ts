@@ -178,6 +178,46 @@ async function main() {
   assert(batchExecutedTools.length === 1 && batchExecutedTools[0] === "requestConsent", "Only requestConsent may succeed in batched call");
   console.log("✔ Passed: Batch tool call injection prevented.");
 
+  // -------------------------------------------------------------------------
+  // TEST 4: Authoritative non-zero amountPaise propagation on requestPayment
+  // -------------------------------------------------------------------------
+  console.log("\n4. Testing authoritative amountPaise return on requestPayment (preventing ₹0 checkout bug)...");
+
+  // Create a valid confirmed consent for ₹8,000 Pegasus 41
+  const productSnapshot = { items: [{ productId: "prod_3", name: "Pegasus 41", price: 8000, qty: 1 }] };
+  const amountPaise = 800000;
+  const cartHash = computeCartHash(productSnapshot, amountPaise);
+
+  const testConsent = await prisma.consent.create({
+    data: {
+      customerId: "cust_gate_test",
+      cartId: "cart_amount_test",
+      amountPaise,
+      productSnapshot,
+      cartHash,
+      status: "CONFIRMED",
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    },
+  });
+
+  const txReq = await createTransactionRequest({
+    customerId: "cust_gate_test",
+    agentId: "agent_revenue",
+    actionType: "CREATE_ORDER",
+    cartId: "cart_amount_test",
+    consentId: testConsent.id,
+  });
+
+  const { requestPayment } = await import("../../src/gateway.js");
+  const paymentResult = await requestPayment(txReq.id);
+
+  console.log("- requestPayment Result:", paymentResult);
+  assert(paymentResult.verdict === "ALLOW", "Payment must be ALLOWed");
+  assert(typeof paymentResult.amountPaise === "number", "amountPaise must be a number");
+  assert(paymentResult.amountPaise === 800000, "amountPaise must strictly match ₹8,000 (800000 paise), never ₹0");
+  assert(paymentResult.amountPaise !== 0, "amountPaise must never be 0");
+  console.log("✔ Passed: Authoritative amountPaise is strictly preserved and returned.");
+
   console.log("\n=== ALL CONSENT GATING TESTS PASSED SUCCESSFULLY ===");
   process.exit(0);
 }
