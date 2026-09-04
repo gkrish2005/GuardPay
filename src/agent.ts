@@ -461,7 +461,7 @@ export function startAgentChat(history: any[] = []) {
   }
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.5-flash-lite",
+    model: "gemini-flash-latest",
     systemInstruction: SYSTEM_INSTRUCTIONS,
     tools: tools as any,
   });
