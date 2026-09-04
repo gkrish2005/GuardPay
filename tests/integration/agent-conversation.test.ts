@@ -95,8 +95,10 @@ async function runTestAgent() {
       const turn2Msg = "Awesome, let's go ahead and buy them!";
       console.log(`\n[CUSTOMER]: ${turn2Msg}`);
 
+      let latestConsentId = "";
       // Callback to simulate out-of-band customer confirmation
       const onConsentRequested = async (consentId: string) => {
+        latestConsentId = consentId;
         console.log(`\n[SYSTEM UI]: Seeding pending consent ID: ${consentId}`);
         console.log("[SIMULATION]: Customer clicks the 'Confirm purchase of ₹7,300' button in their browser...");
         await confirmConsent(consentId);
@@ -113,7 +115,7 @@ async function runTestAgent() {
       console.log(`[AGENT]: ${turn3Reply}`);
 
       // Turn 4: Customer confirms consent signed and asks to proceed
-      const turn4Msg = "I have confirmed the consent on my screen. Please proceed with the payment.";
+      const turn4Msg = `I have confirmed consent ${latestConsentId || "CONFIRMED"} on my screen. Please proceed with creating the transaction request and requesting payment.`;
       console.log(`\n[CUSTOMER]: ${turn4Msg}`);
       const turn4Reply = await runAgentTurn(chat, turn4Msg, context, onConsentRequested);
       console.log(`[AGENT]: ${turn4Reply}`);

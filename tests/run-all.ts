@@ -20,6 +20,8 @@ const TEST_SUITES = [
   { name: "Scale Governance & Revenue Evaluation", category: "unit" as const, file: "tests/unit/evaluation-scale.test.ts" },
   { name: "Concurrency & TOCTOU Daily Cap Serialization", category: "unit" as const, file: "tests/unit/concurrency-toctou.test.ts" },
   { name: "Cryptographic Hash-Chained Audit Log Integrity", category: "unit" as const, file: "tests/unit/hash-chain-audit-log.test.ts" },
+  { name: "Safe Retry Boundary & Non-Replay Guarantee", category: "unit" as const, file: "tests/unit/safe-retry-boundary.test.ts" },
+  { name: "Consent Gating & Session Boundary Enforcement", category: "unit" as const, file: "tests/unit/consent-gating.test.ts" },
   
   // Integration Tests
   { name: "Revenue Agent Conversational Flow", category: "integration" as const, file: "tests/integration/agent-conversation.test.ts" },

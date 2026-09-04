@@ -259,6 +259,7 @@ interface AgentDemoSession {
   lastActive: Date;
   pendingConsentId?: string;
   pendingConsentDetails?: any;
+  confirmedConsentId?: string;
   lastDecision?: any;
 }
 const agentSessions = new Map<string, AgentDemoSession>();
@@ -366,6 +367,21 @@ app.post("/api/agent/consent/confirm", async (req: any, res: any) => {
       return res.status(400).json({ error: "consentId is required" });
     }
 
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required for consent confirmation" });
+    }
+
+    const session = agentSessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Active session not found" });
+    }
+
+    if (session.pendingConsentId !== consentId) {
+      return res.status(400).json({
+        error: `Session pending consent mismatch: expected ${session.pendingConsentId || "none"}, received ${consentId}`,
+      });
+    }
+
     const consent = await prisma.consent.findUnique({ where: { id: consentId } });
     if (!consent) {
       return res.status(404).json({ error: "Consent record not found" });
@@ -384,17 +400,16 @@ app.post("/api/agent/consent/confirm", async (req: any, res: any) => {
       data: { status: "CONFIRMED", confirmedAt: new Date() },
     });
 
-    if (sessionId && agentSessions.has(sessionId)) {
-      const session = agentSessions.get(sessionId)!;
-      session.pendingConsentId = undefined;
-      session.pendingConsentDetails = undefined;
-    }
+    session.pendingConsentId = undefined;
+    session.pendingConsentDetails = undefined;
+    session.confirmedConsentId = updated.id;
 
     await writeAuditLog({
       actor: "human",
       event: "CUSTOMER_CONSENT_CONFIRMED",
       metadata: {
         consentId: updated.id,
+        sessionId: session.id,
         customerId: updated.customerId,
         cartId: updated.cartId,
         amountPaise: updated.amountPaise,

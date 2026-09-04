@@ -181,6 +181,64 @@ async function sendMessageWithRetry(chatSession: any, payload: any, maxRetries =
   }
 }
 
+function synthesizeFallbackResponse(tools: Array<{ name: string; args: any; output?: any; error?: any }>): string {
+  if (!tools || tools.length === 0) {
+    return "I have processed your request.";
+  }
+
+  // If requestPayment was executed:
+  const paymentTool = tools.find(t => t.name === "requestPayment");
+  if (paymentTool) {
+    if (paymentTool.output) {
+      const { verdict, reason, orderId } = paymentTool.output;
+      if (verdict === "ALLOW") {
+        return `Your payment has been authorized and Razorpay order ${orderId || ""} has been created. Please complete checkout on your screen.`;
+      }
+      if (verdict === "NEEDS_APPROVAL") {
+        return `Your order has been created but exceeds the automatic approval threshold (${reason || "requires review"}). It has been submitted for merchant approval.`;
+      }
+      if (verdict === "BLOCK") {
+        return `Your request was blocked by GuardPay governance: ${reason || "Policy limit violation"}. Zero payment calls were executed.`;
+      }
+    }
+    if (paymentTool.error) {
+      return `There was an issue processing payment: ${paymentTool.error}`;
+    }
+  }
+
+  // If requestConsent was executed:
+  const consentTool = tools.find(t => t.name === "requestConsent");
+  if (consentTool) {
+    if (consentTool.output?.consentId) {
+      return `I've prepared your order and sent a consent confirmation request to your screen. Please review and confirm your purchase.`;
+    }
+    if (consentTool.error) {
+      return `Could not prepare consent: ${consentTool.error}`;
+    }
+  }
+
+  // If createTransactionRequest was executed:
+  const txReqTool = tools.find(t => t.name === "createTransactionRequest");
+  if (txReqTool) {
+    if (txReqTool.output?.id) {
+      return `Your transaction request (ID: ${txReqTool.output.id}) has been created successfully. Proceeding with payment governance evaluation.`;
+    }
+    if (txReqTool.error) {
+      return `Could not create transaction request: ${txReqTool.error}`;
+    }
+  }
+
+  // If searchProducts / getProduct / proposeUpsell executed:
+  const searchTool = tools.find(t => t.name === "searchProducts" || t.name === "getProduct");
+  if (searchTool && searchTool.output) {
+    const products = Array.isArray(searchTool.output) ? searchTool.output : [searchTool.output];
+    const productList = products.map((p: any) => `• **${p.name}** – ₹${p.price.toLocaleString('en-IN')} (${p.description})`).join("\n");
+    return `Here are the products found in our catalog:\n\n${productList}\n\nWould you like to select any of these?`;
+  }
+
+  return "Your request has been processed successfully by GuardPay.";
+}
+
 // Executes a conversational turn with the Gemini agent
 export async function runAgentTurn(
   chatSession: any,
@@ -189,25 +247,56 @@ export async function runAgentTurn(
   onConsentRequested?: (consentId: string) => Promise<void>,
   onToolExecuted?: (event: { name: string; args: any; output?: any; error?: any }) => Promise<void> | void
 ): Promise<string> {
-  let result = await sendMessageWithRetry(chatSession, message);
+  let result: any;
+  try {
+    result = await sendMessageWithRetry(chatSession, message);
+  } catch (err: any) {
+    // No tools have run yet on initial message failure
+    throw err;
+  }
+
   let functionCalls = result.response.functionCalls();
+  const executedTools: Array<{ name: string; args: any; output?: any; error?: any }> = [];
 
   while (functionCalls && functionCalls.length > 0) {
     const parts: any[] = [];
+    let consentRequestedThisTurn = false;
 
     for (const call of functionCalls) {
       const { name, args } = call;
-      const handlers = getToolHandlers(context);
-      const handler = handlers[name as keyof typeof handlers];
 
-      if (!handler) {
+      // Hard Consent Gating: If requestConsent was already executed in this turn,
+      // prevent subsequent financial tools (createTransactionRequest / requestPayment)
+      // from executing before explicit customer confirmation.
+      if (consentRequestedThisTurn && (name === "createTransactionRequest" || name === "requestPayment")) {
+        console.warn(`[AGENT CONSENT GATE] Blocking ${name} in the same turn as requestConsent.`);
+        const blockedMsg = "Customer consent is pending confirmation. Cannot create transaction request or request payment until consent is confirmed.";
+        executedTools.push({ name, args, error: blockedMsg });
         if (onToolExecuted) {
-          await onToolExecuted({ name, args, error: `Function handler not found for tool: ${name}` });
+          await onToolExecuted({ name, args, error: blockedMsg });
         }
         parts.push({
           functionResponse: {
             name,
-            response: { error: `Function handler not found for tool: ${name}` },
+            response: { error: blockedMsg },
+          },
+        });
+        continue;
+      }
+
+      const handlers = getToolHandlers(context);
+      const handler = handlers[name as keyof typeof handlers];
+
+      if (!handler) {
+        const errorMsg = `Function handler not found for tool: ${name}`;
+        executedTools.push({ name, args, error: errorMsg });
+        if (onToolExecuted) {
+          await onToolExecuted({ name, args, error: errorMsg });
+        }
+        parts.push({
+          functionResponse: {
+            name,
+            response: { error: errorMsg },
           },
         });
         continue;
@@ -217,6 +306,8 @@ export async function runAgentTurn(
         console.log(`[AGENT TOOL CALL] Executing function "${name}" with args:`, JSON.stringify(args));
         const output = await handler(args as any);
         console.log(`[AGENT TOOL RESPONSE] "${name}" output:`, JSON.stringify(output));
+
+        executedTools.push({ name, args, output });
 
         if (onToolExecuted) {
           await onToolExecuted({ name, args, output });
@@ -230,11 +321,15 @@ export async function runAgentTurn(
         });
 
         // Trigger the out-of-band consent callback if requestConsent is called
-        if (name === "requestConsent" && onConsentRequested) {
-          await onConsentRequested(output.consentId);
+        if (name === "requestConsent") {
+          consentRequestedThisTurn = true;
+          if (onConsentRequested && output?.consentId) {
+            await onConsentRequested(output.consentId);
+          }
         }
       } catch (error: any) {
         console.error(`[AGENT TOOL ERROR] Error executing "${name}":`, error.message || error);
+        executedTools.push({ name, args, error: error.message || error });
         if (onToolExecuted) {
           await onToolExecuted({ name, args, error: error.message || error });
         }
@@ -247,12 +342,38 @@ export async function runAgentTurn(
       }
     }
 
+    // HARD CONSENT GATE: Once requestConsent has executed, halt tool execution immediately.
+    // We send the functionResponse back to the LLM so conversation history remains synchronized,
+    // but we return the conversational response immediately without processing any chained tool calls.
+    if (consentRequestedThisTurn) {
+      try {
+        result = await sendMessageWithRetry(chatSession, parts);
+        const text = result?.response?.text ? result.response.text() : "";
+        if (text && text.trim().length > 0) {
+          return text;
+        }
+      } catch (err: any) {
+        console.warn(`[AGENT TOOL RETRY BOUNDARY] Gemini response failed after requestConsent: ${err.message}`);
+      }
+      return synthesizeFallbackResponse(executedTools);
+    }
+
     // Send the tool execution outputs back to Gemini and get next turn
-    result = await sendMessageWithRetry(chatSession, parts);
-    functionCalls = result.response.functionCalls();
+    try {
+      result = await sendMessageWithRetry(chatSession, parts);
+      functionCalls = result.response.functionCalls();
+    } catch (err: any) {
+      console.warn(`[AGENT TOOL RETRY BOUNDARY] Gemini response failed after tool execution (${err.message}). Synthesizing deterministic fallback from tool state.`);
+      // Tools already executed! Do not replay. Synthesize safe conversational response.
+      return synthesizeFallbackResponse(executedTools);
+    }
   }
 
-  return result.response.text();
+  try {
+    return result.response.text();
+  } catch (err) {
+    return synthesizeFallbackResponse(executedTools);
+  }
 }
 
 export class MockChatSession {
@@ -444,17 +565,23 @@ export class ManualChatSession {
       });
     }
 
-    const result = await this.model.generateContent({ contents: this.history });
-    
-    // Automatically push the assistant's parts to history
-    if (result.response.candidates && result.response.candidates[0]?.content?.parts) {
-      this.history.push({
-        role: "model",
-        parts: result.response.candidates[0].content.parts
-      });
-    }
+    try {
+      const result = await this.model.generateContent({ contents: this.history });
+      
+      // Automatically push the assistant's parts to history
+      if (result.response.candidates && result.response.candidates[0]?.content?.parts) {
+        this.history.push({
+          role: "model",
+          parts: result.response.candidates[0].content.parts
+        });
+      }
 
-    return result;
+      return result;
+    } catch (err) {
+      // Roll back the user message that was pushed so a retry doesn't duplicate history!
+      this.history.pop();
+      throw err;
+    }
   }
 
   async getHistory(): Promise<any[]> {

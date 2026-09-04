@@ -71,10 +71,27 @@ async function main() {
   assert(turn2Res.status === 200, "Turn 2 must return 200");
   assert(!!turn2Data.consentRequired, "Must return consentRequired object");
   assert(turn2Data.consentRequired.status === "PENDING", "Consent status must be PENDING");
+  assert(turn2Data.governanceDecision === null, "Turn 2 must NOT execute payment or governance decision");
   const consentId = turn2Data.consentRequired.consentId;
 
-  // 4. Test POST /api/agent/consent/confirm - Explicit UI Click
-  console.log(`\n4. Testing POST /api/agent/consent/confirm for Consent ID: ${consentId}...`);
+  // 4a. Test Security: Reject consent confirm without sessionId or with mismatched consentId
+  console.log(`\n4a. Testing security rejections on POST /api/agent/consent/confirm...`);
+  const noSessionRes = await fetch(`${serverUrl}/api/agent/consent/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consentId }),
+  });
+  assert(noSessionRes.status === 400, "Must reject consent confirmation without sessionId");
+
+  const mismatchRes = await fetch(`${serverUrl}/api/agent/consent/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, consentId: "cmtn_unrelated_consent" }),
+  });
+  assert(mismatchRes.status === 400, "Must reject mismatched consentId for session");
+
+  // 4b. Test POST /api/agent/consent/confirm - Legitimate Explicit UI Click
+  console.log(`\n4b. Testing POST /api/agent/consent/confirm for Consent ID: ${consentId}...`);
   const confirmRes = await fetch(`${serverUrl}/api/agent/consent/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
