@@ -161,11 +161,18 @@ async function sendMessageWithRetry(chatSession: any, payload: any, maxRetries =
     try {
       return await chatSession.sendMessage(payload);
     } catch (err: any) {
-      const is429 = err.message && (err.message.includes("429") || err.message.includes("Quota exceeded") || err.message.includes("Too Many Requests"));
-      if (is429 && attempt < maxRetries) {
+      const isTransient = err.message && (
+        err.message.includes("429") ||
+        err.message.includes("Quota exceeded") ||
+        err.message.includes("Too Many Requests") ||
+        err.message.includes("503") ||
+        err.message.includes("Service Unavailable") ||
+        err.message.includes("high demand")
+      );
+      if (isTransient && attempt < maxRetries) {
         attempt++;
         const backoffMs = attempt * 3000;
-        console.log(`[AGENT RATE LIMIT] 429 encountered, retrying Gemini call in ${backoffMs}ms (attempt ${attempt}/${maxRetries})...`);
+        console.log(`[AGENT RETRY] Transient error encountered (${err.message.slice(0, 80)}...), retrying Gemini call in ${backoffMs}ms (attempt ${attempt}/${maxRetries})...`);
         await new Promise(r => setTimeout(r, backoffMs));
       } else {
         throw err;
@@ -461,7 +468,7 @@ export function startAgentChat(history: any[] = []) {
   }
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: "gemini-3.5-flash-lite",
     systemInstruction: SYSTEM_INSTRUCTIONS,
     tools: tools as any,
   });
