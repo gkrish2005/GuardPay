@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuardPay Governance | Pending Approvals</title>
+  <!-- Google Fonts Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --success-hover: #059669;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.15);
+      --font-outfit: 'Outfit', sans-serif;
+      --font-inter: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-inter);
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+    }
+
+    header {
+      margin-bottom: 3rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: var(--font-outfit);
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(to right, #a5b4fc, #6366f1, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 400;
+    }
+
+    /* Approvals List */
+    .approvals-list {
+      display: grid;
+      grid-gap: 1.5rem;
+      width: 100%;
+    }
+
+    .approval-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    .approval-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(99, 102, 241, 0.25);
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Slide Out Micro-Animation */
+    .approval-card.dismissed {
+      transform: translateX(100px) scale(0.95);
+      opacity: 0;
+      margin-bottom: -150px;
+      pointer-events: none;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 1rem;
+    }
+
+    .meta-info h3 {
+      font-family: var(--font-outfit);
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-info p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      font-family: var(--font-outfit);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      letter-spacing: 0.05em;
+    }
+
+    .badge.needs-approval {
+      background: var(--warning-bg);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .card-body {
+      margin-bottom: 1.5rem;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .detail-label {
+      color: var(--text-muted);
+    }
+
+    .detail-val {
+      font-weight: 500;
+    }
+
+    .amount-large {
+      font-family: var(--font-outfit);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #60a5fa;
+      margin: 1rem 0;
+      display: flex;
+      align-items: baseline;
+    }
+
+    .amount-large span {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-left: 0.25rem;
+      font-weight: 400;
+    }
+
+    /* Cart Items Snapshot */
+    .cart-summary {
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .cart-summary-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    }
+
+    .cart-item:last-child {
+      border-bottom: none;
+    }
+
+    /* Card Actions */
+    .card-actions {
+      display: flex;
+      gap: 1rem;
+    }
+
+    button {
+      flex: 1;
+      font-family: var(--font-outfit);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.85rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-approve {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .btn-approve:hover:not(:disabled) {
+      background: var(--success-hover);
+      box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-reject {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--danger);
+    }
+
+    .btn-reject:hover:not(:disabled) {
+      background: var(--danger);
+      color: #fff;
+      box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.3);
+    }
+
+    /* Empty State */
+    .empty-state {
+      background: var(--card-bg);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 4rem 2rem;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      width: 100%;
+      margin-top: 2rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 1.5rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state h2 {
+      font-family: var(--font-outfit);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+      max-width: 400px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .toast.error {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .toast-message {
+      font-size: 0.9rem;
+      color: #f1f5f9;
+      font-weight: 500;
+    }
+
+    /* Spinner */
+    .spinner {
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 2.5px solid #fff;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>GuardPay Governance</h1>
+      <p>Deterministic AI Control Center & Approval Dashboard</p>
+    </header>
+
+    <div id="approvals-container" class="approvals-list">
+      <!-- Approvals list items will be injected here -->
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast" class="toast">
+    <div id="toast-icon-container"></div>
+    <div id="toast-message" class="toast-message">Action processed successfully.</div>
+  </div>
+
+  <script>
+    const approvalsContainer = document.getElementById('approvals-container');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+    const toastIconContainer = document.getElementById('toast-icon-container');
+
+    // Show custom toast notification
+    function showToast(message, type = 'success') {
+      toastMessage.textContent = message;
+      toast.className = `toast show ${type}`;
+
+      if (type === 'success') {
+        toastIconContainer.innerHTML = `
+          <svg class="toast-icon" style="color:#10b981" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        `;
+      } else {
+        toastIconContainer.innerHTML = `
+          <svg class="toast-icon" style="color:#ef4444" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        `;
+      }
+
+      setTimeout(() => {
+        toast.className = 'toast';
+      }, 4000);
+    }
+
+    // Load list of pending approvals
+    async function loadApprovals() {
+      approvalsContainer.innerHTML = `
+        <div style="text-align:center; padding: 3rem; color: var(--text-muted)">
+          <div class="spinner" style="border-top-color: var(--primary); width:32px; height:32px; margin-bottom: 1rem"></div>
+          <p>Retrieving pending transactions...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/approvals');
+        const pending = await response.json();
+
+        if (pending.length === 0) {
+          renderEmptyState();
+          return;
+        }
+
+        approvalsContainer.innerHTML = '';
+        pending.forEach(item => {
+          const card = createApprovalCard(item);
+          approvalsContainer.appendChild(card);
+        });
+      } catch (err) {
+        console.error(err);
+        approvalsContainer.innerHTML = `
+          <div class="empty-state" style="border-color: rgba(239, 68, 68, 0.3)">
+            <h2>System Error</h2>
+            <p>Failed to communicate with GuardPay governance servers.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderEmptyState() {
+      approvalsContainer.innerHTML = `
+        <div class="empty-state">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <h2>All Caught Up!</h2>
+          <p>There are no transaction requests awaiting manual approval right now.</p>
+        </div>
+      `;
+    }
+
+    function createApprovalCard(item) {
+      const { decision, request } = item;
+      const amountRupees = (request.amountPaise / 100).toLocaleString('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+      });
+
+      const dateString = new Date(decision.decidedAt).toLocaleString();
+
+      const card = document.createElement('div');
+      card.className = 'approval-card';
+      card.id = `card-${decision.id}`;
+
+      // Build cart snapshot rendering
+      let cartHtml = '';
+      if (request.cartSnapshot && request.cartSnapshot.items) {
+        cartHtml = `
+          <div class="cart-summary">
+            <div class="cart-summary-title">Cart Items</div>
+            ${request.cartSnapshot.items.map(i => `
+              <div class="cart-item">
+                <span>${i.name} (x${i.qty})</span>
+                <span style="font-weight:600">₹${i.price.toLocaleString('en-IN')}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="meta-info">
+            <h3>Request from ${request.agentId}</h3>
+            <p>Triggered on ${dateString}</p>
+          </div>
+          <span class="badge needs-approval">Needs Approval</span>
+        </div>
+        <div class="card-body">
+          <div class="detail-row">
+            <span class="detail-label">Customer ID</span>
+            <span class="detail-val">${request.customerId}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Decision Reason</span>
+            <span class="detail-val" style="color:var(--warning)">${decision.reason}</span>
+          </div>
+          <div class="amount-large">
+            ${amountRupees} <span>INR total</span>
+          </div>
+          ${cartHtml}
+        </div>
+        <div class="card-actions">
+          <button class="btn-reject" onclick="processApproval('${decision.id}', 'reject')">
+            Reject Request
+          </button>
+          <button class="btn-approve" onclick="processApproval('${decision.id}', 'approve')">
+            Approve & Create Payment
+          </button>
+        </div>
+      `;
+
+      return card;
+    }
+
+    // Process human decision
+    async function processApproval(decisionId, action) {
+      const card = document.getElementById(`card-${decisionId}`);
+      const buttons = card.querySelectorAll('button');
+      
+      // Disable buttons and show loading state
+      buttons.forEach(btn => btn.disabled = true);
+      const actionButton = card.querySelector(action === 'approve' ? '.btn-approve' : '.btn-reject');
+      const originalText = actionButton.innerHTML;
+      actionButton.innerHTML = `<span class="spinner"></span> Processing...`;
+
+      try {
+        const response = await fetch(`/api/approvals/${decisionId}/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`Transaction successfully ${action === 'approve' ? 'approved' : 'rejected'}!`, 'success');
+          
+          // Smooth slide-out card dismissal animation
+          card.classList.add('dismissed');
+          setTimeout(() => {
+            card.remove();
+            if (approvalsContainer.querySelectorAll('.approval-card').length === 0) {
+              renderEmptyState();
+            }
+          }, 450); // Allow time for CSS transitions to finish
+        } else {
+          showToast(data.error || 'Failed to process request', 'error');
+          buttons.forEach(btn => btn.disabled = false);
+          actionButton.innerHTML = originalText;
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Network error while processing decision', 'error');
+        buttons.forEach(btn => btn.disabled = false);
+        actionButton.innerHTML = originalText;
+      }
+    }
+
+    // Load data on page load
+    loadApprovals();
+  </script>
+</body>
+</html>

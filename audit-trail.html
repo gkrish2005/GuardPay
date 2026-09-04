@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GuardPay Governance | Audit Trail</title>
+  <!-- Google Fonts Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      
+      --color-allow: #10b981;
+      --color-block: #ef4444;
+      --color-pending: #f59e0b;
+      --color-system: #3b82f6;
+      
+      --font-outfit: 'Outfit', sans-serif;
+      --font-inter: 'Inter', sans-serif;
+      --font-code: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-inter);
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+    }
+
+    header {
+      margin-bottom: 3rem;
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      font-family: var(--font-outfit);
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(to right, #a5b4fc, #6366f1, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 400;
+      margin-bottom: 1.25rem;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .nav-links a {
+      color: #a5b4fc;
+      text-decoration: none;
+      font-weight: 600;
+      font-family: var(--font-outfit);
+      font-size: 0.95rem;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .nav-links a:hover {
+      color: #e0e7ff;
+    }
+
+    /* Timeline Styling */
+    .timeline {
+      position: relative;
+      padding-left: 2.5rem;
+      margin-top: 2rem;
+    }
+
+    /* Vertical line */
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0.75rem;
+      top: 0.5rem;
+      bottom: 0.5rem;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 2rem;
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Marker circle */
+    .timeline-marker {
+      position: absolute;
+      left: -2.125rem;
+      top: 0.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      z-index: 2;
+      transition: all 0.3s ease;
+    }
+
+    .timeline-item:hover .timeline-marker {
+      transform: scale(1.2);
+    }
+
+    /* Color coding dots */
+    .timeline-item.allow .timeline-marker {
+      border-color: var(--color-allow);
+      box-shadow: 0 0 8px var(--color-allow);
+    }
+
+    .timeline-item.block .timeline-marker {
+      border-color: var(--color-block);
+      box-shadow: 0 0 8px var(--color-block);
+    }
+
+    .timeline-item.pending .timeline-marker {
+      border-color: var(--color-pending);
+      box-shadow: 0 0 8px var(--color-pending);
+    }
+
+    .timeline-item.system .timeline-marker {
+      border-color: var(--color-system);
+    }
+
+    /* Card Content */
+    .timeline-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      transition: border-color 0.2s ease;
+    }
+
+    .timeline-content:hover {
+      border-color: rgba(99, 102, 241, 0.25);
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .event-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .event-name {
+      font-family: var(--font-outfit);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.01em;
+    }
+
+    .actor-badge {
+      font-family: var(--font-outfit);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      letter-spacing: 0.03em;
+    }
+
+    .timestamp {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .tx-ref {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .tx-ref span {
+      color: #a5b4fc;
+      font-family: var(--font-code);
+      font-size: 0.8rem;
+    }
+
+    /* Metadata details */
+    .metadata-toggle {
+      font-size: 0.8rem;
+      color: #6366f1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      user-select: none;
+      margin-bottom: 0.5rem;
+    }
+
+    .metadata-toggle:hover {
+      color: #818cf8;
+    }
+
+    .metadata-block {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      margin-top: 0.5rem;
+      overflow-x: auto;
+      display: none;
+    }
+
+    .metadata-block.show {
+      display: block;
+    }
+
+    .metadata-block pre {
+      font-family: var(--font-code);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+
+    /* Empty State */
+    .empty-state {
+      background: var(--card-bg);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 4rem 2rem;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      width: 100%;
+      margin-top: 2rem;
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 1.5rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state h2 {
+      font-family: var(--font-outfit);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Spinner */
+    .spinner {
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 2.5px solid #fff;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Governance Audit Trail</h1>
+      <p>Chronological Immutable Ledger of GuardPay AI system actions</p>
+      <div class="nav-links">
+        <a href="/approvals.html">
+          <svg style="width:16px;height:16px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          Manage Pending Approvals
+        </a>
+      </div>
+    </header>
+
+    <div id="timeline-container" class="timeline">
+      <!-- Timeline items will be injected here -->
+    </div>
+  </div>
+
+  <script>
+    const timelineContainer = document.getElementById('timeline-container');
+
+    // Get color class based on event name
+    function getEventClass(eventName) {
+      const name = eventName.toUpperCase();
+      
+      // Allowed events
+      if (name.includes('ALLOW') || name.includes('SUCCESS') || name.includes('APPROVED') || name.includes('CAPTURED')) {
+        return 'allow';
+      }
+      // Blocked events
+      if (name.includes('BLOCK') || name.includes('REJECT') || name.includes('MISMATCH') || name.includes('FAIL')) {
+        return 'block';
+      }
+      // Pending approvals
+      if (name.includes('NEEDS_APPROVAL') || name.includes('OUT_OF_ORDER')) {
+        return 'pending';
+      }
+      
+      return 'system';
+    }
+
+    // Toggle raw metadata visibility
+    window.toggleMetadata = function(id) {
+      const block = document.getElementById(`meta-${id}`);
+      const link = document.getElementById(`toggle-${id}`);
+      if (block.classList.contains('show')) {
+        block.classList.remove('show');
+        link.innerHTML = 'Show Raw Payload &#9662;';
+      } else {
+        block.classList.add('show');
+        link.innerHTML = 'Hide Raw Payload &#9652;';
+      }
+    };
+
+    // Load list of audit logs
+    async function loadAuditLogs() {
+      timelineContainer.innerHTML = `
+        <div style="text-align:center; padding: 3rem; color: var(--text-muted)">
+          <div class="spinner" style="border-top-color: var(--primary); margin-bottom: 1rem"></div>
+          <p>Retrieving chronological audit ledger...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/audit-logs');
+        const logs = await response.json();
+
+        if (logs.length === 0) {
+          timelineContainer.innerHTML = `
+            <div class="empty-state">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h2>No Records Found</h2>
+              <p>The system audit log is currently empty.</p>
+            </div>
+          `;
+          return;
+        }
+
+        timelineContainer.innerHTML = '';
+        logs.forEach(log => {
+          const item = createTimelineItem(log);
+          timelineContainer.appendChild(item);
+        });
+      } catch (err) {
+        console.error(err);
+        timelineContainer.innerHTML = `
+          <div class="empty-state" style="border-color: rgba(239, 68, 68, 0.3)">
+            <h2>System Error</h2>
+            <p>Failed to retrieve audit ledger from GuardPay governance servers.</p>
+          </div>
+        `;
+      }
+    }
+
+    function createTimelineItem(log) {
+      const eventClass = getEventClass(log.event);
+      const timeString = new Date(log.timestamp).toLocaleString();
+      const item = document.createElement('div');
+      item.className = `timeline-item ${eventClass}`;
+
+      const refHtml = log.transactionRequestId 
+        ? `<div class="tx-ref">Request ID: <span>${log.transactionRequestId}</span></div>` 
+        : '';
+
+      const metadataString = JSON.stringify(log.metadata, null, 2);
+
+      item.innerHTML = `
+        <div class="timeline-marker"></div>
+        <div class="timeline-content">
+          <div class="item-header">
+            <div class="event-info">
+              <span class="event-name">${log.event}</span>
+              <span class="actor-badge">${log.actor}</span>
+            </div>
+            <span class="timestamp">${timeString}</span>
+          </div>
+          ${refHtml}
+          <div>
+            <span id="toggle-${log.id}" class="metadata-toggle" onclick="toggleMetadata('${log.id}')">
+              Show Raw Payload &#9662;
+            </span>
+            <div id="meta-${log.id}" class="metadata-block">
+              <pre><code>${metadataString}</code></pre>
+            </div>
+          </div>
+        </div>
+      `;
+
+      return item;
+    }
+
+    // Load logs on page load
+    loadAuditLogs();
+  </script>
+</body>
+</html>

@@ -1,13 +1,124 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+datasource db {
+  provider = "sqlite"
+}
 
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
-datasource db {
-  provider = "sqlite"
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  permissions Json     // { payment: { enabled: true, maxAmount: 500000 }, ... } (amounts in paise)
+  createdAt   DateTime @default(now())
+}
+
+model Policy {
+  id                 String   @id @default(cuid())
+  agentId            String
+  actionType         String   // e.g. CREATE_ORDER, ADD_PAID_ADDON
+  maxAmount          Int      // paise
+  approvalThreshold  Int      // paise
+  maxDiscountPercent Int      @default(0)
+  dailyTxLimit       Int
+  dailyValueLimit    Int      // paise
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+
+  @@unique([agentId, actionType, version])
+}
+
+model Consent {
+  id               String    @id @default(cuid())
+  customerId       String
+  cartId           String
+  productSnapshot  Json      // exact items, quantities, unit prices as shown to the customer
+  cartHash         String    // canonical hash of productSnapshot + amountPaise, computed server-side
+  amountPaise      Int       // server-derived total, never client-supplied
+  status           String    // PENDING | CONFIRMED | EXPIRED | REVOKED
+  campaignCode     String?
+  createdAt        DateTime  @default(now())
+  confirmedAt      DateTime?
+  expiresAt        DateTime?
+}
+
+model TransactionRequest {
+  id           String   @id @default(cuid())
+  agentId      String
+  customerId   String
+  actionType   String
+  amountPaise  Int
+  currency     String   @default("INR")
+  cartSnapshot Json
+  consentId    String?  // FK to Consent — replaces the old boolean; NULL means no consent obtained
+  campaignCode String?
+  requestedAt  DateTime @default(now())
+}
+
+model Decision {
+  id                    String   @id @default(cuid())
+  transactionRequestId  String
+  verdict               String   // ALLOW | NEEDS_APPROVAL | BLOCK
+  reason                String
+  signalsChecked        Json
+  policyVersion         Int?
+  decidedAt             DateTime @default(now())
+}
+
+model Transaction {
+  id                    String   @id @default(cuid())
+  transactionRequestId  String
+  razorpayOrderId       String?
+  razorpayPaymentId     String?
+  status                String   // CREATED | CHECKOUT_OPENED | AUTHORIZED | CAPTURED | FAILED
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model AuditLog {
+  id                    String   @id @default(cuid())
+  transactionRequestId  String?
+  actor                 String   // "agent" | "human" | "system"
+  event                 String
+  metadata              Json
+  previousHash          String?
+  eventHash             String?
+  timestamp             DateTime @default(now())
+}
+
+model WebhookEvent {
+  id               String    @id @default(cuid())
+  razorpayEventId  String    @unique
+  eventType        String
+  payloadHash      String
+  receivedAt       DateTime  @default(now())
+  processedAt      DateTime?
+  status           String    // RECEIVED | PROCESSED | IGNORED_DUPLICATE
+}
+
+model Approval {
+  id                    String   @id @default(cuid())
+  transactionRequestId  String   @unique
+  requestHash           String   // hash of { amountPaise, cartSnapshot, actionType, policyVersion }
+  status                String   // PENDING | APPROVED | REJECTED | EXPIRED
+  approvedBy            String?
+  expiresAt             DateTime
+  approvedAt            DateTime?
+}
+
+model Campaign {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  discountPercent   Int
+  allowedProductIds Json     // List of product IDs
+  isActive          Boolean  @default(true)
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+}
+
+model CartCampaign {
+  cartId       String   @id
+  campaignCode String
+  createdAt    DateTime @default(now())
 }
